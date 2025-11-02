@@ -48,7 +48,7 @@ temp/
 # === Backend specific ===
 backend/node_modules/
 backend/dist/
-backend/.env
+# backend/.env
 
 # === Frontend specific ===
 frontend/node_modules/

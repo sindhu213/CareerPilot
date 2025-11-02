@@ -68,7 +68,7 @@ const handleSignup = async (e: React.FormEvent) => {
         name: signupName,
         email: signupEmail,
         password: signupPassword,
-        github: "", // optional fields if you want
+        github: "", 
       }),
     });
 

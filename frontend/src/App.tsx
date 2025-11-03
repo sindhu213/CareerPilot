@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { LandingPage } from './components/LandingPage';
 import { AuthPage } from './components/AuthPage';
 import { Dashboard } from './components/Dashboard';
@@ -36,39 +36,74 @@ export type User = {
   resumeUrl?: string;
 };
 
-export type Page = 
-  | 'landing' 
-  | 'auth' 
-  | 'dashboard' 
-  | 'profile' 
-  | 'resume-builder' 
-  | 'resume-analyzer' 
-  | 'career-paths' 
-  | 'jobs' 
+export type Page =
+  | 'landing'
+  | 'auth'
+  | 'dashboard'
+  | 'profile'
+  | 'resume-builder'
+  | 'resume-analyzer'
+  | 'career-paths'
+  | 'jobs'
   | 'applications';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('landing');
   const [user, setUser] = useState<User | null>(null);
 
-  const handleLogin = (userData: User) => {
-    setUser(userData);
-    setCurrentPage('dashboard');
+  const handleLogin = async (userData: User) => {
+    try {
+      const res = await fetch('http://localhost:5001/api/users', {
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const fullProfile = await res.json();
+        setUser(fullProfile);
+        setCurrentPage('dashboard');
+      } else {
+        // if profile doesn’t exist yet, create a blank one
+        const createRes = await fetch('http://localhost:5001/api/users', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ github: userData.name.toLowerCase() }),
+        });
+        const newProfile = await createRes.json();
+        setUser(newProfile);
+        setCurrentPage('dashboard');
+      }
+    } catch (err) {
+      console.error('Error fetching user profile:', err);
+    }
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    setCurrentPage('landing');
+  const handleLogout = async () => {
+    try {
+      await fetch('http://localhost:5001/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch (err) {
+      console.error('Error logging out', err);
+    } finally {
+      setUser(null);
+      setCurrentPage('landing');
+    }
   };
 
+  // ---------------- PAGE RENDERING ----------------
   const renderPage = () => {
+    if (!user && currentPage !== 'landing' && currentPage !== 'auth') {
+      return <AuthPage onLogin={handleLogin} onBack={() => setCurrentPage('landing')} />;
+    }
+
     switch (currentPage) {
       case 'landing':
         return <LandingPage onGetStarted={() => setCurrentPage('auth')} />;
       case 'auth':
         return <AuthPage onLogin={handleLogin} onBack={() => setCurrentPage('landing')} />;
       case 'dashboard':
-        return <Dashboard user={user!} onNavigate={setCurrentPage} />;
+        return <Dashboard user={user!} onNavigate={setCurrentPage} onLogout={handleLogout} />;
       case 'profile':
         return <ProfilePage user={user!} onUpdateUser={setUser} onNavigate={setCurrentPage} />;
       case 'resume-builder':
@@ -86,6 +121,7 @@ export default function App() {
     }
   };
 
+  // ---------------- MAIN RENDER ----------------
   return (
     <div className="size-full bg-background">
       {renderPage()}

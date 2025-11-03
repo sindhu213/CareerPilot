@@ -124,8 +124,10 @@ export function ProfilePage({ user, onUpdateUser, onNavigate }: ProfilePageProps
       const res = await fetch("http://localhost:5001/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include", 
         body: JSON.stringify(updatedUser),
-    });
+      });
+
     if (!res.ok) throw new Error("Failed to save data");
     const savedUser = await res.json();
 

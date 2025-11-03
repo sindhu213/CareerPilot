@@ -4,40 +4,50 @@ import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// GET user profile (by GitHub username for simplicity)
-router.get("/:github", async (req, res) => {
+router.get("/", authMiddleware, async (req, res) => {
   try {
-    const user = await User.findOne({ github: req.params.github });
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const user = await User.findOne({ authUserId: req.userId });
+    if (!user) return res.status(404).json({ message: "Profile not found" });
     res.json(user);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
 
-// POST (create or update user) — protected so only authenticated users can create/update their profile
 router.post("/", authMiddleware, async (req, res) => {
   try {
     const data = req.body || {};
 
+    // fill name/email automatically from auth user
     if (req.user) {
-      if (!data.email) data.email = req.user.email;
-      if (!data.name) data.name = req.user.name;
+      data.email = req.user.email;
+      data.name = req.user.name;
     }
 
-    if (!data.github) return res.status(400).json({ message: "`github` username is required" });
+    // always tie this profile to the authenticated user
+    let user = await User.findOne({ authUserId: req.userId });
 
-    const existing = await User.findOne({ github: data.github });
-    if (existing) {
-      const updated = await User.findOneAndUpdate({ github: data.github }, data, {
-        new: true,
-      });
-      return res.json(updated);
+    if (user) {
+      Object.assign(user, data);
+      await user.save();
     } else {
-      const newUser = new User(data);
-      await newUser.save();
-      return res.status(201).json(newUser);
+      user = await User.create({
+        authUserId: req.userId,
+        ...data,
+      });
     }
+
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.get("/:github", async (req, res) => {
+  try {
+    const user = await User.findOne({ github: req.params.github });
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json(user);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

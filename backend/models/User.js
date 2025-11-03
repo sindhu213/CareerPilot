@@ -9,14 +9,21 @@ const educationSchema = new mongoose.Schema({
 
 const userSchema = new mongoose.Schema(
   {
-    name: { type: String },
-    email: { type: String },
-    phone: { type: String },
-    location: { type: String },
-    linkedin: { type: String },
+    authUserId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "AuthUser",
+      required: true,
+      unique: true
+    },
+
+    name: String,
+    email: String,
+    phone: String,
+    location: String,
+    linkedin: String,
     github: { type: String, required: true },
-    portfolio: { type: String },
-    profileImageUrl: { type: String },
+    portfolio: String,
+    profileImageUrl: String,
 
     technicalSkills: [String],
     softSkills: [String],

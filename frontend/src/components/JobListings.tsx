@@ -256,7 +256,7 @@ export function JobListings({ user, onNavigate }: JobListingsProps) {
                 <p className="text-xs text-muted-foreground mb-2">Required Skills:</p>
                 <div className="flex flex-wrap gap-2">
                   {job.skills.map((skill) => {
-                    const hasSkill = user.skills.includes(skill);
+                   const hasSkill = user.skills?.includes(skill) ?? false;
                     return (
                       <Badge 
                         key={skill} 

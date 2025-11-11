@@ -1,4 +1,3 @@
-// server.js
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -6,6 +5,7 @@ import cookieParser from "cookie-parser";
 import { connectDB } from "./config/db.js";
 import userRoutes from "./routes/userRoutes.js"; 
 import authRoutes from "./routes/authRoutes.js";
+import resumeRoutes from "./routes/resumeRoutes.js";
 
 dotenv.config();
 
@@ -26,6 +26,7 @@ app.use(cookieParser());
 
 app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/resumes", resumeRoutes);
 
 connectDB();
 

@@ -1,18 +1,19 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "./DashboardLayout";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Label } from "./ui/label";
-import { Download, Eye, Plus, X } from "lucide-react";
+import { Download, Eye, Plus, X, Save, History, Edit, Trash2 } from "lucide-react";
 import { toast } from "sonner@2.0.3";
 import type { User, Page } from "../App";
+import jsPDF from "jspdf";
 
 type ResumeBuilderProps = {
   user: User;
   onNavigate: (page: Page) => void;
+  onResumeGenerated: (pdfUrl: string) => void;
 };
 
 type Experience = {
@@ -35,11 +36,42 @@ type Education = {
   description: string;
 };
 
+type SavedResumeData = {
+  experiences: Experience[];
+  projects: Project[];
+  educations: Education[];
+  summary: string;
+  linkedin: string;
+  github: string;
+  portfolio: string;
+  phone: string;
+  address: string;
+  certifications: string[];
+  hobbies: string[];
+};
+
+type ResumeHistory = {
+  _id?: string;
+  userId: string;
+  resumeName: string;
+  data: SavedResumeData;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export function ResumeBuilder({
   user,
   onNavigate,
+  onResumeGenerated,
 }: ResumeBuilderProps) {
   const [showPreview, setShowPreview] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [resumeHistory, setResumeHistory] = useState<ResumeHistory[]>([]);
+  const [currentResumeId, setCurrentResumeId] = useState<string | null>(null);
+  const [resumeName, setResumeName] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Draft state (editable)
   const [experiences, setExperiences] = useState<Experience[]>([
     { title: "", company: "", duration: "", description: "" },
   ]);
@@ -50,19 +82,292 @@ export function ResumeBuilder({
     { degree: "", institution: "", year: "", description: "" },
   ]);
   const [summary, setSummary] = useState("");
-
-  // New fields
   const [linkedin, setLinkedin] = useState("");
   const [github, setGithub] = useState("");
   const [portfolio, setPortfolio] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
-
-  // Dynamic fields
-  const [certifications, setCertifications] = useState<
-    string[]
-  >([""]);
+  const [certifications, setCertifications] = useState<string[]>([""]);
   const [hobbies, setHobbies] = useState<string[]>([""]);
+
+  // Saved state (used for preview and download)
+  const [savedData, setSavedData] = useState<SavedResumeData | null>(null);
+
+  const isDataSaved = savedData !== null;
+
+  // MongoDB API endpoints - Update these with your actual backend URL
+  const API_BASE_URL = "http://localhost:5001/api";
+
+  // Fetch resume history on component mount
+  useEffect(() => {
+    fetchResumeHistory();
+  }, []);
+
+  const fetchResumeHistory = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`${API_BASE_URL}/resumes?userId=${encodeURIComponent(user.email)}`, 
+        {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setResumeHistory(data);
+      }
+    } catch (error) {
+      console.error("Error fetching resume history:", error);
+      toast.error("Failed to load resume history");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const saveResumeToMongoDB = async () => {
+    if (!resumeName.trim()) {
+      toast.error("Please enter a resume name");
+      return;
+    }
+
+    if (resumeHistory.length >= 3 && !currentResumeId) {
+      toast.error("Maximum 3 resumes allowed. Please delete one to create a new resume.");
+      return;
+    }
+
+    const dataToSave: SavedResumeData = {
+      experiences: [...experiences],
+      projects: [...projects],
+      educations: [...educations],
+      summary,
+      linkedin,
+      github,
+      portfolio,
+      phone,
+      address,
+      certifications: [...certifications],
+      hobbies: [...hobbies],
+    };
+
+    try {
+      setIsLoading(true);
+      const url = currentResumeId
+        ? `${API_BASE_URL}/resumes/${currentResumeId}`
+        : `${API_BASE_URL}/resumes`;
+
+      const method = currentResumeId ? "PUT" : "POST";
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          userId: user.email,
+          resumeName,
+          data: dataToSave,
+        }),
+      });
+
+      if (response.ok) {
+        const savedResume = await response.json();
+        setSavedData(dataToSave);
+        setCurrentResumeId(savedResume._id);
+        await fetchResumeHistory();
+        toast.success(
+          currentResumeId
+            ? "Resume updated successfully!"
+            : "Resume saved successfully!"
+        );
+      } else {
+        toast.error("Failed to save resume");
+      }
+    } catch (error) {
+      console.error("Error saving resume:", error);
+      toast.error("Failed to save resume");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadResumeFromHistory = (resume: ResumeHistory) => {
+    const data = resume.data;
+    setExperiences(data.experiences);
+    setProjects(data.projects);
+    setEducations(data.educations);
+    setSummary(data.summary);
+    setLinkedin(data.linkedin);
+    setGithub(data.github);
+    setPortfolio(data.portfolio);
+    setPhone(data.phone);
+    setAddress(data.address);
+    setCertifications(data.certifications);
+    setHobbies(data.hobbies);
+    setSavedData(data);
+    setResumeName(resume.resumeName);
+    setCurrentResumeId(resume._id || null);
+    setShowHistory(false);
+    toast.success(`Loaded resume: ${resume.resumeName}`);
+  };
+
+  const deleteResumeFromHistory = async (resumeId: string) => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`${API_BASE_URL}/resumes/${resumeId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        await fetchResumeHistory();
+        if (currentResumeId === resumeId) {
+          resetForm();
+        }
+        toast.success("Resume deleted successfully");
+      } else {
+        toast.error("Failed to delete resume");
+      }
+    } catch (error) {
+      console.error("Error deleting resume:", error);
+      toast.error("Failed to delete resume");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resetForm = () => {
+    setExperiences([{ title: "", company: "", duration: "", description: "" }]);
+    setProjects([{ name: "", description: "", technologies: "" }]);
+    setEducations([{ degree: "", institution: "", year: "", description: "" }]);
+    setSummary("");
+    setLinkedin("");
+    setGithub("");
+    setPortfolio("");
+    setPhone("");
+    setAddress("");
+    setCertifications([""]);
+    setHobbies([""]);
+    setSavedData(null);
+    setResumeName("");
+    setCurrentResumeId(null);
+  };
+
+  const handleSave = () => {
+    const dataToSave: SavedResumeData = {
+      experiences: [...experiences],
+      projects: [...projects],
+      educations: [...educations],
+      summary,
+      linkedin,
+      github,
+      portfolio,
+      phone,
+      address,
+      certifications: [...certifications],
+      hobbies: [...hobbies],
+    };
+    setSavedData(dataToSave);
+    toast.success("Resume data saved locally!");
+  };
+
+  const handlePreview = () => {
+    if (!isDataSaved) {
+      toast.error("Please save your changes before previewing");
+      return;
+    }
+    setShowPreview(!showPreview);
+  };
+
+  const handleDownloadClick = () => {
+    if (!isDataSaved) {
+      toast.error("Please save your changes before downloading");
+      return;
+    }
+    handleDownload();
+  };
+
+  const handleDownload = () => {
+    if (!savedData) return;
+
+    try {
+      const doc = new jsPDF();
+
+      doc.setFontSize(20);
+      doc.text(user.name || "Your Name", 10, 20);
+
+      doc.setFontSize(11);
+      let y = 30;
+      doc.text(`Email: ${user.email}`, 10, y);
+      if (savedData.phone) {
+        y += 8;
+        doc.text(`Phone: ${savedData.phone}`, 10, y);
+      }
+      if (savedData.linkedin) {
+        y += 8;
+        doc.text(`LinkedIn: ${savedData.linkedin}`, 10, y);
+      }
+      if (savedData.github) {
+        y += 8;
+        doc.text(`GitHub: ${savedData.github}`, 10, y);
+      }
+
+      if (savedData.summary) {
+        y += 15;
+        doc.setFontSize(14);
+        doc.text("Professional Summary", 10, y);
+        y += 8;
+        doc.setFontSize(11);
+        const splitSummary = doc.splitTextToSize(savedData.summary, 180);
+        doc.text(splitSummary, 10, y);
+        y += splitSummary.length * 6;
+      }
+
+      if (savedData.educations.some((e) => e.degree)) {
+        y += 10;
+        doc.setFontSize(14);
+        doc.text("Education", 10, y);
+        y += 8;
+        doc.setFontSize(11);
+        savedData.educations.forEach((edu) => {
+          if (edu.degree) {
+            doc.text(`${edu.degree} - ${edu.institution} (${edu.year})`, 10, y);
+            y += 6;
+          }
+        });
+      }
+
+      if (savedData.experiences.some((e) => e.title)) {
+        y += 10;
+        doc.setFontSize(14);
+        doc.text("Experience", 10, y);
+        y += 8;
+        doc.setFontSize(11);
+        savedData.experiences.forEach((exp) => {
+          if (exp.title) {
+            doc.text(`${exp.title} at ${exp.company} (${exp.duration})`, 10, y);
+            y += 6;
+          }
+        });
+      }
+
+      const blob = doc.output("blob");
+      const pdfUrl = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = pdfUrl;
+      link.download = `${resumeName || user.name || "resume"}.pdf`;
+      link.click();
+
+      onResumeGenerated(pdfUrl);
+
+      toast.success("Resume downloaded successfully!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to generate resume.");
+    }
+  };
 
   // --- Experience Handlers ---
   const handleAddExperience = () => {
@@ -74,7 +379,7 @@ export function ResumeBuilder({
   const handleUpdateExperience = (
     index: number,
     field: keyof Experience,
-    value: string,
+    value: string
   ) => {
     const updated = [...experiences];
     updated[index] = { ...updated[index], [field]: value };
@@ -86,14 +391,11 @@ export function ResumeBuilder({
 
   // --- Project Handlers ---
   const handleAddProject = () =>
-    setProjects([
-      ...projects,
-      { name: "", description: "", technologies: "" },
-    ]);
+    setProjects([...projects, { name: "", description: "", technologies: "" }]);
   const handleUpdateProject = (
     index: number,
     field: keyof Project,
-    value: string,
+    value: string
   ) => {
     const updated = [...projects];
     updated[index] = { ...updated[index], [field]: value };
@@ -103,20 +405,14 @@ export function ResumeBuilder({
     setProjects(projects.filter((_, i) => i !== index));
 
   // --- Certification Handlers ---
-  const handleAddCertification = () =>
-    setCertifications([...certifications, ""]);
-  const handleUpdateCertification = (
-    index: number,
-    value: string,
-  ) => {
+  const handleAddCertification = () => setCertifications([...certifications, ""]);
+  const handleUpdateCertification = (index: number, value: string) => {
     const updated = [...certifications];
     updated[index] = value;
     setCertifications(updated);
   };
   const handleRemoveCertification = (index: number) =>
-    setCertifications(
-      certifications.filter((_, i) => i !== index),
-    );
+    setCertifications(certifications.filter((_, i) => i !== index));
 
   // --- Hobby Handlers ---
   const handleAddHobby = () => setHobbies([...hobbies, ""]);
@@ -128,26 +424,16 @@ export function ResumeBuilder({
   const handleRemoveHobby = (index: number) =>
     setHobbies(hobbies.filter((_, i) => i !== index));
 
-  const handleDownload = () => {
-    toast.success("Resume downloaded successfully!");
-    // Implement jsPDF or html2pdf in production
-  };
-
   // --- Education Handlers ---
   const handleAddEducation = () =>
     setEducations([
       ...educations,
-      {
-        degree: "",
-        institution: "",
-        year: "",
-        description: "",
-      },
+      { degree: "", institution: "", year: "", description: "" },
     ]);
   const handleUpdateEducation = (
     index: number,
     field: keyof Education,
-    value: string,
+    value: string
   ) => {
     const updated = [...educations];
     updated[index] = { ...updated[index], [field]: value };
@@ -156,148 +442,256 @@ export function ResumeBuilder({
   const handleRemoveEducation = (index: number) =>
     setEducations(educations.filter((_, i) => i !== index));
 
-  const ResumePreview = () => (
-    <div className="bg-white text-black p-8 space-y-6">
-      <div className="text-center border-b-2 border-black pb-4">
-        <h1 className="text-3xl mb-2">{user.name}</h1>
-        {phone && <p className="text-sm">📞 {phone}</p>}
-        {address && <p className="text-sm">🏠 {address}</p>}
-        <p className="text-sm">{user.email}</p>
-        {linkedin && (
-          <p className="text-sm">🔗 LinkedIn: {linkedin}</p>
+  const ResumePreview = () => {
+    if (!savedData) return null;
+
+    const allSkills = [
+      ...(user.technicalSkills || []),
+      ...(user.softSkills || []),
+      ...(user.toolsAndTechnologies || []),
+    ];
+
+    return (
+      <div className="bg-white text-black p-8 space-y-6">
+        <div className="text-center border-b-2 border-black pb-4">
+          <h1 className="text-3xl mb-2">{user.name}</h1>
+          {savedData.phone && <p className="text-sm">📞 {savedData.phone}</p>}
+          {savedData.address && <p className="text-sm">🏠 {savedData.address}</p>}
+          <p className="text-sm">{user.email}</p>
+          {savedData.linkedin && (
+            <p className="text-sm">🔗 LinkedIn: {savedData.linkedin}</p>
+          )}
+          {savedData.github && (
+            <p className="text-sm">🐱 GitHub: {savedData.github}</p>
+          )}
+          {savedData.portfolio && (
+            <p className="text-sm">💼 Portfolio: {savedData.portfolio}</p>
+          )}
+        </div>
+
+        {savedData.educations.some((e) => e.degree) && (
+          <div>
+            <h2 className="text-xl mb-2 border-b border-gray-300">Education</h2>
+            <div className="space-y-3">
+              {savedData.educations
+                .filter((e) => e.degree)
+                .map((edu, idx) => (
+                  <div key={idx}>
+                    <h3 className="text-base">{edu.degree}</h3>
+                    <p className="text-sm text-gray-600">
+                      {edu.institution} | {edu.year}
+                    </p>
+                    {edu.description && (
+                      <p className="text-sm mt-1">{edu.description}</p>
+                    )}
+                  </div>
+                ))}
+            </div>
+          </div>
         )}
-        {github && (
-          <p className="text-sm">🐱 GitHub: {github}</p>
+
+        {savedData.summary && (
+          <div>
+            <h2 className="text-xl mb-2 border-b border-gray-300">
+              Professional Summary
+            </h2>
+            <p className="text-sm">{savedData.summary}</p>
+          </div>
         )}
-        {portfolio && (
-          <p className="text-sm">💼 Portfolio: {portfolio}</p>
+
+        {allSkills.length > 0 && (
+          <div>
+            <h2 className="text-xl mb-2 border-b border-gray-300">Skills</h2>
+            <div className="flex flex-wrap gap-2">
+              {allSkills.map((skill, idx) => (
+                <span
+                  key={idx}
+                  className="text-sm bg-gray-200 px-2 py-1 rounded"
+                >
+                  {skill}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {savedData.experiences.some((e) => e.title) && (
+          <div>
+            <h2 className="text-xl mb-2 border-b border-gray-300">Experience</h2>
+            <div className="space-y-3">
+              {savedData.experiences
+                .filter((e) => e.title)
+                .map((exp, idx) => (
+                  <div key={idx}>
+                    <h3 className="text-base">{exp.title}</h3>
+                    <p className="text-sm text-gray-600">
+                      {exp.company} | {exp.duration}
+                    </p>
+                    <p className="text-sm mt-1">{exp.description}</p>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {savedData.projects.some((p) => p.name) && (
+          <div>
+            <h2 className="text-xl mb-2 border-b border-gray-300">Projects</h2>
+            <div className="space-y-3">
+              {savedData.projects
+                .filter((p) => p.name)
+                .map((proj, idx) => (
+                  <div key={idx}>
+                    <h3 className="text-base">{proj.name}</h3>
+                    <p className="text-sm">{proj.description}</p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Technologies: {proj.technologies}
+                    </p>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {savedData.certifications.some((c) => c) && (
+          <div>
+            <h2 className="text-xl mb-2 border-b border-gray-300">
+              Certifications
+            </h2>
+            <ul className="list-disc pl-5 text-sm">
+              {savedData.certifications
+                .filter((c) => c)
+                .map((c, idx) => (
+                  <li key={idx}>{c}</li>
+                ))}
+            </ul>
+          </div>
+        )}
+
+        {savedData.hobbies.some((h) => h) && (
+          <div>
+            <h2 className="text-xl mb-2 border-b border-gray-300">
+              Hobbies & Interests
+            </h2>
+            <ul className="list-disc pl-5 text-sm">
+              {savedData.hobbies
+                .filter((h) => h)
+                .map((h, idx) => (
+                  <li key={idx}>{h}</li>
+                ))}
+            </ul>
+          </div>
         )}
       </div>
+    );
+  };
 
-      {educations.some((e) => e.degree) && (
+  const HistoryTab = () => (
+    <div className="max-w-4xl space-y-6">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-xl mb-2 border-b border-gray-300">
-            Education
-          </h2>
-          <div className="space-y-3">
-            {educations
-              .filter((e) => e.degree)
-              .map((edu, idx) => (
-                <div key={idx}>
-                  <h3 className="text-base">{edu.degree}</h3>
-                  <p className="text-sm text-gray-600">
-                    {edu.institution} | {edu.year}
-                  </p>
-                  {edu.description && (
-                    <p className="text-sm mt-1">
-                      {edu.description}
+          <h2 className="text-2xl font-semibold">Resume History</h2>
+          <p className="text-muted-foreground">
+            You can save up to 3 resumes. Load or delete existing resumes.
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => setShowHistory(false)}>
+          Back to Editor
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <Card className="p-8 text-center">
+          <p>Loading resume history...</p>
+        </Card>
+      ) : resumeHistory.length === 0 ? (
+        <Card className="p-8 text-center">
+          <History className="size-12 mx-auto mb-4 text-muted-foreground" />
+          <h3 className="text-lg mb-2">No Resumes Yet</h3>
+          <p className="text-muted-foreground mb-4">
+            Create your first resume to get started!
+          </p>
+          <Button onClick={() => setShowHistory(false)}>
+            Create Resume
+          </Button>
+        </Card>
+      ) : (
+        <div className="grid gap-4">
+          {resumeHistory.map((resume) => (
+            <Card key={resume._id} className="p-6">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold mb-2">
+                    {resume.resumeName}
+                  </h3>
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    <p>
+                      Created: {new Date(resume.createdAt).toLocaleDateString()}
                     </p>
-                  )}
+                    <p>
+                      Updated: {new Date(resume.updatedAt).toLocaleDateString()}
+                    </p>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {resume.data.experiences.filter((e) => e.title).length >
+                        0 && (
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          {
+                            resume.data.experiences.filter((e) => e.title)
+                              .length
+                          }{" "}
+                          Experience(s)
+                        </span>
+                      )}
+                      {resume.data.projects.filter((p) => p.name).length >
+                        0 && (
+                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                          {resume.data.projects.filter((p) => p.name).length}{" "}
+                          Project(s)
+                        </span>
+                      )}
+                      {resume.data.educations.filter((e) => e.degree).length >
+                        0 && (
+                        <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                          {
+                            resume.data.educations.filter((e) => e.degree)
+                              .length
+                          }{" "}
+                          Education(s)
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              ))}
-          </div>
-        </div>
-      )}
-
-      {summary && (
-        <div>
-          <h2 className="text-xl mb-2 border-b border-gray-300">
-            Professional Summary
-          </h2>
-          <p className="text-sm">{summary}</p>
-        </div>
-      )}
-
-      {user.skills.length > 0 && (
-        <div>
-          <h2 className="text-xl mb-2 border-b border-gray-300">
-            Skills
-          </h2>
-          <div className="flex flex-wrap gap-2">
-            {user.skills.map((skill) => (
-              <span
-                key={skill}
-                className="text-sm bg-gray-200 px-2 py-1 rounded"
-              >
-                {skill}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {experiences.some((e) => e.title) && (
-        <div>
-          <h2 className="text-xl mb-2 border-b border-gray-300">
-            Experience
-          </h2>
-          <div className="space-y-3">
-            {experiences
-              .filter((e) => e.title)
-              .map((exp, idx) => (
-                <div key={idx}>
-                  <h3 className="text-base">{exp.title}</h3>
-                  <p className="text-sm text-gray-600">
-                    {exp.company} | {exp.duration}
-                  </p>
-                  <p className="text-sm mt-1">
-                    {exp.description}
-                  </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadResumeFromHistory(resume)}
+                  >
+                    <Edit className="size-4 mr-2" />
+                    Load
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => deleteResumeFromHistory(resume._id!)}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
                 </div>
-              ))}
-          </div>
+              </div>
+            </Card>
+          ))}
         </div>
       )}
 
-      {projects.some((p) => p.name) && (
-        <div>
-          <h2 className="text-xl mb-2 border-b border-gray-300">
-            Projects
-          </h2>
-          <div className="space-y-3">
-            {projects
-              .filter((p) => p.name)
-              .map((proj, idx) => (
-                <div key={idx}>
-                  <h3 className="text-base">{proj.name}</h3>
-                  <p className="text-sm">{proj.description}</p>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Technologies: {proj.technologies}
-                  </p>
-                </div>
-              ))}
-          </div>
-        </div>
-      )}
-
-      {certifications.some((c) => c) && (
-        <div>
-          <h2 className="text-xl mb-2 border-b border-gray-300">
-            Certifications
-          </h2>
-          <ul className="list-disc pl-5 text-sm">
-            {certifications
-              .filter((c) => c)
-              .map((c, idx) => (
-                <li key={idx}>{c}</li>
-              ))}
-          </ul>
-        </div>
-      )}
-
-      {hobbies.some((h) => h) && (
-        <div>
-          <h2 className="text-xl mb-2 border-b border-gray-300">
-            Hobbies & Interests
-          </h2>
-          <ul className="list-disc pl-5 text-sm">
-            {hobbies
-              .filter((h) => h)
-              .map((h, idx) => (
-                <li key={idx}>{h}</li>
-              ))}
-          </ul>
-        </div>
+      {resumeHistory.length < 3 && (
+        <Card className="p-4 bg-accent">
+          <p className="text-sm text-muted-foreground">
+            💡 You have {3 - resumeHistory.length} resume slot(s) remaining.
+          </p>
+        </Card>
       )}
     </div>
   );
@@ -308,36 +702,91 @@ export function ResumeBuilder({
       onNavigate={onNavigate}
       userName={user.name}
     >
-      <div className="p-8">
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="mb-2">Resume Builder</h1>
-            <p className="text-muted-foreground">
-              Create a professional resume using your profile
-              data
-            </p>
-          </div>
-          <div className="flex gap-2">
+        <div className="p-8">
+    <div className="mb-8 flex items-center justify-between">
+      <div>
+        <h1 className="mb-2">Resume Builder</h1>
+        <p className="text-muted-foreground">
+          Create a professional resume using your profile data
+        </p>
+
+        {/* How It Works */}
+        <div className="mt-6 max-w-xl">
+          <h2 className="text-base font-semibold mb-1">How it works</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Your data is saved locally when you click the save button. Only then
+            can you preview the resume template. Once you're satisfied with how
+            it appears, you can save it to the database or download it for job
+            applications.
+          </p>
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          onClick={() => setShowHistory(!showHistory)}
+        >
+          <History className="size-4 mr-2" />
+          History ({resumeHistory.length}/3)
+        </Button>
+
+        {!showHistory && (
+          <>
             <Button
               variant="outline"
-              onClick={() => setShowPreview(!showPreview)}
+              onClick={handlePreview}
+              disabled={!isDataSaved}
             >
               <Eye className="size-4 mr-2" />
               {showPreview ? "Edit" : "Preview"}
             </Button>
-            <Button onClick={handleDownload}>
+
+            <Button onClick={handleDownloadClick} disabled={!isDataSaved}>
               <Download className="size-4 mr-2" />
               Download PDF
             </Button>
-          </div>
-        </div>
 
-        {showPreview ? (
+            <Button onClick={handleSave}>
+              <Save className="size-4 mr-2" />
+              Save
+            </Button>
+          </>
+        )}
+      </div>
+    </div>
+
+        {showHistory ? (
+          <HistoryTab />
+        ) : showPreview ? (
           <Card className="max-w-4xl mx-auto">
             <ResumePreview />
           </Card>
         ) : (
           <div className="max-w-4xl space-y-6">
+            {/* Resume Name */}
+            <Card className="p-6">
+              <h3 className="mb-4">Resume Name</h3>
+              <Input
+                value={resumeName}
+                onChange={(e) => setResumeName(e.target.value)}
+                placeholder="e.g., Software Engineer Resume"
+              />
+              <div className="mt-4">
+                <Button
+                  onClick={saveResumeToMongoDB}
+                  disabled={isLoading || !resumeName.trim()}
+                  className="w-full"
+                >
+                  {isLoading
+                    ? "Saving..."
+                    : currentResumeId
+                    ? "Update in Database"
+                    : "Save to Database"}
+                </Button>
+              </div>
+            </Card>
+
             {/* Professional Summary */}
             <Card className="p-6">
               <h3 className="mb-4">Professional Summary</h3>
@@ -349,8 +798,7 @@ export function ResumeBuilder({
               />
             </Card>
 
-            {/* education */}
-
+            {/* Education */}
             <Card className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3>Education</h3>
@@ -375,9 +823,7 @@ export function ResumeBuilder({
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() =>
-                            handleRemoveEducation(index)
-                          }
+                          onClick={() => handleRemoveEducation(index)}
                         >
                           <X className="size-4" />
                         </Button>
@@ -392,7 +838,7 @@ export function ResumeBuilder({
                             handleUpdateEducation(
                               index,
                               "degree",
-                              e.target.value,
+                              e.target.value
                             )
                           }
                           placeholder="e.g., B.Tech in CSE"
@@ -407,7 +853,7 @@ export function ResumeBuilder({
                             handleUpdateEducation(
                               index,
                               "institution",
-                              e.target.value,
+                              e.target.value
                             )
                           }
                           placeholder="e.g., Sarala Birla University"
@@ -420,11 +866,7 @@ export function ResumeBuilder({
                       <Input
                         value={edu.year}
                         onChange={(e) =>
-                          handleUpdateEducation(
-                            index,
-                            "year",
-                            e.target.value,
-                          )
+                          handleUpdateEducation(index, "year", e.target.value)
                         }
                         placeholder="e.g., 2022 - 2026"
                         className="mt-1"
@@ -438,7 +880,7 @@ export function ResumeBuilder({
                           handleUpdateEducation(
                             index,
                             "description",
-                            e.target.value,
+                            e.target.value
                           )
                         }
                         placeholder="Optional description / achievements"
@@ -477,9 +919,7 @@ export function ResumeBuilder({
                   <Label>LinkedIn</Label>
                   <Input
                     value={linkedin}
-                    onChange={(e) =>
-                      setLinkedin(e.target.value)
-                    }
+                    onChange={(e) => setLinkedin(e.target.value)}
                     placeholder="https://linkedin.com/in/yourprofile"
                     className="mt-1"
                   />
@@ -497,9 +937,7 @@ export function ResumeBuilder({
                   <Label>Portfolio / Website</Label>
                   <Input
                     value={portfolio}
-                    onChange={(e) =>
-                      setPortfolio(e.target.value)
-                    }
+                    onChange={(e) => setPortfolio(e.target.value)}
                     placeholder="https://yourportfolio.com"
                     className="mt-1"
                   />
@@ -522,17 +960,11 @@ export function ResumeBuilder({
               </div>
               <div className="space-y-3">
                 {certifications.map((cert, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-2"
-                  >
+                  <div key={idx} className="flex items-center gap-2">
                     <Input
                       value={cert}
                       onChange={(e) =>
-                        handleUpdateCertification(
-                          idx,
-                          e.target.value,
-                        )
+                        handleUpdateCertification(idx, e.target.value)
                       }
                       placeholder="Enter certification name"
                     />
@@ -540,9 +972,7 @@ export function ResumeBuilder({
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() =>
-                          handleRemoveCertification(idx)
-                        }
+                        onClick={() => handleRemoveCertification(idx)}
                       >
                         <X className="size-4" />
                       </Button>
@@ -556,26 +986,17 @@ export function ResumeBuilder({
             <Card className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3>Hobbies & Interests</h3>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAddHobby}
-                >
+                <Button variant="outline" size="sm" onClick={handleAddHobby}>
                   <Plus className="size-4 mr-2" />
                   Add Hobby
                 </Button>
               </div>
               <div className="space-y-3">
                 {hobbies.map((h, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-2"
-                  >
+                  <div key={idx} className="flex items-center gap-2">
                     <Input
                       value={h}
-                      onChange={(e) =>
-                        handleUpdateHobby(idx, e.target.value)
-                      }
+                      onChange={(e) => handleUpdateHobby(idx, e.target.value)}
                       placeholder="Enter hobby or interest"
                     />
                     {hobbies.length > 1 && (
@@ -617,9 +1038,7 @@ export function ResumeBuilder({
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() =>
-                            handleRemoveExperience(index)
-                          }
+                          onClick={() => handleRemoveExperience(index)}
                         >
                           <X className="size-4" />
                         </Button>
@@ -634,7 +1053,7 @@ export function ResumeBuilder({
                             handleUpdateExperience(
                               index,
                               "title",
-                              e.target.value,
+                              e.target.value
                             )
                           }
                           placeholder="e.g., Software Engineer"
@@ -649,7 +1068,7 @@ export function ResumeBuilder({
                             handleUpdateExperience(
                               index,
                               "company",
-                              e.target.value,
+                              e.target.value
                             )
                           }
                           placeholder="e.g., TechCorp"
@@ -665,7 +1084,7 @@ export function ResumeBuilder({
                           handleUpdateExperience(
                             index,
                             "duration",
-                            e.target.value,
+                            e.target.value
                           )
                         }
                         placeholder="e.g., Jan 2023 - Present"
@@ -680,7 +1099,7 @@ export function ResumeBuilder({
                           handleUpdateExperience(
                             index,
                             "description",
-                            e.target.value,
+                            e.target.value
                           )
                         }
                         placeholder="Describe your responsibilities and achievements..."
@@ -697,11 +1116,7 @@ export function ResumeBuilder({
             <Card className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3>Projects</h3>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAddProject}
-                >
+                <Button variant="outline" size="sm" onClick={handleAddProject}>
                   <Plus className="size-4 mr-2" />
                   Add Project
                 </Button>
@@ -718,9 +1133,7 @@ export function ResumeBuilder({
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() =>
-                            handleRemoveProject(index)
-                          }
+                          onClick={() => handleRemoveProject(index)}
                         >
                           <X className="size-4" />
                         </Button>
@@ -731,11 +1144,7 @@ export function ResumeBuilder({
                       <Input
                         value={proj.name}
                         onChange={(e) =>
-                          handleUpdateProject(
-                            index,
-                            "name",
-                            e.target.value,
-                          )
+                          handleUpdateProject(index, "name", e.target.value)
                         }
                         placeholder="e.g., CareerPilot Platform"
                         className="mt-1"
@@ -749,7 +1158,7 @@ export function ResumeBuilder({
                           handleUpdateProject(
                             index,
                             "description",
-                            e.target.value,
+                            e.target.value
                           )
                         }
                         placeholder="Describe what the project does and your role..."
@@ -765,7 +1174,7 @@ export function ResumeBuilder({
                           handleUpdateProject(
                             index,
                             "technologies",
-                            e.target.value,
+                            e.target.value
                           )
                         }
                         placeholder="e.g., React, Node.js, MongoDB"
@@ -780,9 +1189,8 @@ export function ResumeBuilder({
             {/* Info Card */}
             <Card className="p-4 bg-accent">
               <p className="text-sm text-muted-foreground">
-                💡 Your basic info, skills, and education from
-                your profile are automatically included. Update
-                your{" "}
+                💡 Your basic info, skills, and education from your profile are
+                automatically included. Update your{" "}
                 <button
                   onClick={() => onNavigate("profile")}
                   className="text-primary underline"

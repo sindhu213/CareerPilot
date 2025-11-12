@@ -106,6 +106,7 @@ export function ResumeBuilder({
   const fetchResumeHistory = async () => {
     try {
       setIsLoading(true);
+      console.log(user.email)
       const response = await fetch(`${API_BASE_URL}/resumes?userId=${encodeURIComponent(user.email)}`, 
         {
         method: "GET",
@@ -733,6 +734,19 @@ export function ResumeBuilder({
 
         {!showHistory && (
           <>
+            {currentResumeId && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  resetForm();
+                  toast.success("Ready to create a new resume!");
+                }}
+              >
+                <Plus className="size-4 mr-2" />
+                New Resume
+              </Button>
+            )}
+
             <Button
               variant="outline"
               onClick={handlePreview}

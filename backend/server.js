@@ -4,7 +4,6 @@ import cors from "cors";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import { connectDB } from "./config/db.js";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 import userRoutes from "./routes/userRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -24,14 +23,12 @@ app.use(cookieParser());
 
 app.use(
   cors({
-    origin: CLIENT_URL, // 👈 frontend origin
-    credentials: true, // 👈 allow sending cookies
+    origin: CLIENT_URL, 
+    credentials: true, 
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-
-export const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);

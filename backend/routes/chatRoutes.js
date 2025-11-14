@@ -14,7 +14,7 @@ router.post("/", async (req, res) => {
 
     console.log("msg ------------", message);
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
     const result = await model.generateContent(message);
     const reply = result.response.text();
@@ -24,6 +24,16 @@ router.post("/", async (req, res) => {
   } catch (error) {
     console.error("Gemini API Error:", error.message);
     res.status(500).json({ message: "Gemini API request failed" });
+  }
+});
+
+router.get("/models", async (req, res) => {
+  try {
+    const result = await genAI.listModels();
+    res.json(result);
+  } catch (err) {
+    console.error("List Models Error:", err);
+    res.status(500).json({ error: "Unable to list models." });
   }
 });
 

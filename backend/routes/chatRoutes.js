@@ -57,8 +57,19 @@ router.post("/", async (req, res) => {
     console.log("msg ------------", message);
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash", 
-      contents: message,
+      model: "gemini-2.5-flash",
+      contents: [
+        {
+          type: "system",
+          text: `You are a career guidance assistant. Your role is to help users make informed decisions to build a successful career.
+                - Give relevant advice based on the user's question.
+                - Be concise, actionable, and encouraging.
+                - Avoid irrelevant or generic answers.`
+        },
+        { type: "user", text: message }
+      ],
+      temperature: 0.5,
+      maxOutputTokens: 80,
     });
 
     const reply = response.text; 

@@ -58,3 +58,6 @@ frontend/.env
 # === Optional ===
 # Local configuration
 *.local
+
+# === Temporary files ===
+tmp.txt

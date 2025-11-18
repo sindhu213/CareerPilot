@@ -33,7 +33,6 @@ type Application = {
 };
 
 export function Applications({ user, onNavigate }: ApplicationsProps) {
-  console.log('User object:', user);
   const [applications, setApplications] = useState<Application[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [formData, setFormData] = useState({

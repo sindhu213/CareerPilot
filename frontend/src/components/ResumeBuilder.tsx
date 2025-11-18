@@ -290,85 +290,229 @@ export function ResumeBuilder({
   };
 
   const handleDownload = () => {
-    if (!savedData) return;
+  if (!savedData) return;
 
-    try {
-      const doc = new jsPDF();
+  try {
+    const doc = new jsPDF();
+    let y = 20; // vertical cursor
 
-      doc.setFontSize(20);
-      doc.text(user.name || "Your Name", 10, 20);
+    // ---------- HEADER ----------
+    doc.setFontSize(22);
+    doc.text(user.name || "Your Name", 10, y);
+    y += 10;
+
+    doc.setFontSize(11);
+    if (user.location) {
+      doc.text(`${user.location}`, 10, y);
+      y += 6;
+    }
+    if (user.email) {
+      doc.text(`${user.email}`, 10, y);
+      y += 6;
+    }
+    if (savedData.phone) {
+      doc.text(`${savedData.phone}`, 10, y);
+      y += 6;
+    }
+    if (savedData.linkedin) {
+      doc.text(`${savedData.linkedin}`, 10, y);
+      y += 6;
+    }
+    if (savedData.github) {
+      doc.text(`${savedData.github}`, 10, y);
+      y += 10;
+    }
+
+    // Horizontal line
+    doc.setLineWidth(0.5);
+    doc.line(10, y, 200, y);
+    y += 10;
+
+    // ========== SUMMARY ==========
+    if (savedData.summary) {
+      doc.setFontSize(14);
+      doc.text("Professional Summary", 10, y);
+      y += 8;
 
       doc.setFontSize(11);
-      let y = 30;
-      doc.text(`Email: ${user.email}`, 10, y);
-      if (savedData.phone) {
-        y += 8;
-        doc.text(`Phone: ${savedData.phone}`, 10, y);
-      }
-      if (savedData.linkedin) {
-        y += 8;
-        doc.text(`LinkedIn: ${savedData.linkedin}`, 10, y);
-      }
-      if (savedData.github) {
-        y += 8;
-        doc.text(`GitHub: ${savedData.github}`, 10, y);
-      }
-
-      if (savedData.summary) {
-        y += 15;
-        doc.setFontSize(14);
-        doc.text("Professional Summary", 10, y);
-        y += 8;
-        doc.setFontSize(11);
-        const splitSummary = doc.splitTextToSize(savedData.summary, 180);
-        doc.text(splitSummary, 10, y);
-        y += splitSummary.length * 6;
-      }
-
-      if (savedData.educations.some((e) => e.degree)) {
-        y += 10;
-        doc.setFontSize(14);
-        doc.text("Education", 10, y);
-        y += 8;
-        doc.setFontSize(11);
-        savedData.educations.forEach((edu) => {
-          if (edu.degree) {
-            doc.text(`${edu.degree} - ${edu.institution} (${edu.year})`, 10, y);
-            y += 6;
-          }
-        });
-      }
-
-      if (savedData.experiences.some((e) => e.title)) {
-        y += 10;
-        doc.setFontSize(14);
-        doc.text("Experience", 10, y);
-        y += 8;
-        doc.setFontSize(11);
-        savedData.experiences.forEach((exp) => {
-          if (exp.title) {
-            doc.text(`${exp.title} at ${exp.company} (${exp.duration})`, 10, y);
-            y += 6;
-          }
-        });
-      }
-
-      const blob = doc.output("blob");
-      const pdfUrl = URL.createObjectURL(blob);
-
-      const link = document.createElement("a");
-      link.href = pdfUrl;
-      link.download = `${resumeName || user.name || "resume"}.pdf`;
-      link.click();
-
-      onResumeGenerated(pdfUrl);
-
-      toast.success("Resume downloaded successfully!");
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to generate resume.");
+      const lines = doc.splitTextToSize(savedData.summary, 180);
+      doc.text(lines, 10, y);
+      y += lines.length * 6 + 6;
     }
-  };
+
+    // ========== EDUCATION ==========
+    if (savedData.educations?.some(e => e.degree)) {
+      doc.setFontSize(14);
+      doc.text("Education", 10, y);
+      y += 8;
+
+      doc.setFontSize(11);
+      savedData.educations.forEach(edu => {
+        if (!edu.degree) return;
+        doc.text(`${edu.degree}`, 10, y);
+        y += 6;
+        doc.text(`${edu.institution} | ${edu.year}`, 10, y);
+        y += 8;
+        if (edu.description) {
+          const ed = doc.splitTextToSize(edu.description, 180);
+          doc.text(ed, 10, y);
+          y += ed.length * 6 + 4;
+        }
+      });
+
+      y += 6;
+    }
+
+    // ========== EXPERIENCE ==========
+    if (savedData.experiences?.some(e => e.title)) {
+      doc.setFontSize(14);
+      doc.text("Experience", 10, y);
+      y += 8;
+
+      doc.setFontSize(11);
+      savedData.experiences.forEach(exp => {
+        if (!exp.title) return;
+
+        doc.text(`${exp.title} — ${exp.company}`, 10, y);
+        y += 6;
+        if (exp.duration) {
+          doc.text(`${exp.duration}`, 10, y);
+          y += 6;
+        }
+        if (exp.description) {
+          const ex = doc.splitTextToSize(exp.description, 180);
+          doc.text(ex, 10, y);
+          y += ex.length * 6 + 6;
+        }
+      });
+
+      y += 6;
+    }
+
+    // ========== PROJECTS ==========
+    if (savedData.projects?.some(p => p.name)) {
+      doc.setFontSize(14);
+      doc.text("Projects", 10, y);
+      y += 8;
+
+      doc.setFontSize(11);
+      savedData.projects.forEach(proj => {
+        if (!proj.name) return;
+        doc.text(`${proj.name}`, 10, y);
+        y += 6;
+        if (proj.technologies) {
+          doc.text(`Tech: ${proj.technologies}`, 10, y);
+          y += 6;
+        }
+        if (proj.description) {
+          const pr = doc.splitTextToSize(proj.description, 180);
+          doc.text(pr, 10, y);
+          y += pr.length * 6 + 6;
+        }
+      });
+
+      y += 6;
+    }
+
+    // ========== CERTIFICATIONS ==========
+    if (savedData.certifications?.length) {
+      doc.setFontSize(14);
+      doc.text("Certifications", 10, y);
+      y += 8;
+
+      doc.setFontSize(11);
+      savedData.certifications.forEach(cert => {
+        doc.text(`• ${cert}`, 10, y);
+        y += 6;
+      });
+
+      y += 6;
+    }
+
+    // ========== SKILLS (FROM USER MODEL) ==========
+    if (
+      user.technicalSkills?.length ||
+      user.softSkills?.length ||
+      user.toolsAndTechnologies?.length
+    ) {
+      doc.setFontSize(14);
+      doc.text("Skills", 10, y);
+      y += 8;
+
+      doc.setFontSize(12);
+      if (user.technicalSkills?.length) {
+        doc.text("Technical Skills:", 10, y);
+        y += 6;
+        doc.setFontSize(11);
+        const tech = doc.splitTextToSize(user.technicalSkills.join(", "), 180);
+        doc.text(tech, 10, y);
+        y += tech.length * 6 + 6;
+      }
+
+      doc.setFontSize(12);
+      if (user.softSkills?.length) {
+        doc.text("Soft Skills:", 10, y);
+        y += 6;
+        doc.setFontSize(11);
+        const soft = doc.splitTextToSize(user.softSkills.join(", "), 180);
+        doc.text(soft, 10, y);
+        y += soft.length * 6 + 6;
+      }
+
+      doc.setFontSize(12);
+      if (user.toolsAndTechnologies?.length) {
+        doc.text("Tools & Technologies:", 10, y);
+        y += 6;
+        doc.setFontSize(11);
+        const tools = doc.splitTextToSize(user.toolsAndTechnologies.join(", "), 180);
+        doc.text(tools, 10, y);
+        y += tools.length * 6 + 6;
+      }
+
+      y += 6;
+    }
+
+    // ========== LANGUAGES ==========
+    if (user.languages?.length) {
+      doc.setFontSize(14);
+      doc.text("Languages", 10, y);
+      y += 8;
+
+      doc.setFontSize(11);
+      const langs = doc.splitTextToSize(user.languages.join(", "), 180);
+      doc.text(langs, 10, y);
+      y += langs.length * 6 + 6;
+    }
+
+    // ========== INTERESTS ==========
+    if (user.interests?.length) {
+      doc.setFontSize(14);
+      doc.text("Interests", 10, y);
+      y += 8;
+
+      doc.setFontSize(11);
+      user.interests.forEach(interest => {
+        doc.text(`• ${interest}`, 10, y);
+        y += 6;
+      });
+    }
+
+    // ---------- DOWNLOAD ----------
+    const blob = doc.output("blob");
+    const pdfUrl = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = pdfUrl;
+    link.download = `${resumeName || user.name || "resume"}.pdf`;
+    link.click();
+
+    toast.success("Resume downloaded successfully!");
+
+  } catch (error) {
+    console.error(error);
+    toast.error("Failed to generate resume.");
+  }
+};
 
   // --- Experience Handlers ---
   const handleAddExperience = () => {
@@ -444,148 +588,162 @@ export function ResumeBuilder({
     setEducations(educations.filter((_, i) => i !== index));
 
   const ResumePreview = () => {
-    if (!savedData) return null;
+  if (!savedData || !user) return null;
 
-    const allSkills = [
-      ...(user.technicalSkills || []),
-      ...(user.softSkills || []),
-      ...(user.toolsAndTechnologies || []),
-    ];
+  // Merge all dynamic skills from user model
+  const allSkills = [
+    ...(user.technicalSkills || []),
+    ...(user.softSkills || []),
+    ...(user.toolsAndTechnologies || []),
+  ];
 
-    return (
-      <div className="bg-white text-black p-8 space-y-6">
-        <div className="text-center border-b-2 border-black pb-4">
-          <h1 className="text-3xl mb-2">{user.name}</h1>
-          {savedData.phone && <p className="text-sm">📞 {savedData.phone}</p>}
-          {savedData.address && <p className="text-sm">🏠 {savedData.address}</p>}
-          <p className="text-sm">{user.email}</p>
-          {savedData.linkedin && (
-            <p className="text-sm">🔗 LinkedIn: {savedData.linkedin}</p>
-          )}
-          {savedData.github && (
-            <p className="text-sm">🐱 GitHub: {savedData.github}</p>
-          )}
-          {savedData.portfolio && (
-            <p className="text-sm">💼 Portfolio: {savedData.portfolio}</p>
-          )}
-        </div>
+  return (
+    <div className="bg-white text-black p-8 space-y-6">
 
-        {savedData.educations.some((e) => e.degree) && (
-          <div>
-            <h2 className="text-xl mb-2 border-b border-gray-300">Education</h2>
-            <div className="space-y-3">
-              {savedData.educations
-                .filter((e) => e.degree)
-                .map((edu, idx) => (
-                  <div key={idx}>
-                    <h3 className="text-base">{edu.degree}</h3>
-                    <p className="text-sm text-gray-600">
-                      {edu.institution} | {edu.year}
-                    </p>
-                    {edu.description && (
-                      <p className="text-sm mt-1">{edu.description}</p>
-                    )}
-                  </div>
-                ))}
-            </div>
-          </div>
+      {/* HEADER */}
+      <div className="text-center border-b-2 border-black pb-4">
+        <h1 className="text-3xl mb-2">{user.name || "Your Name"}</h1>
+
+        {/* Contact */}
+        {savedData.phone && <p className="text-sm">📞 {savedData.phone}</p>}
+        {savedData.address && <p className="text-sm">🏠 {savedData.address}</p>}
+        
+        <p className="text-sm">{user.email}</p>
+
+        {user.linkedin && (
+          <p className="text-sm">🔗 LinkedIn: {user.linkedin}</p>
         )}
 
-        {savedData.summary && (
-          <div>
-            <h2 className="text-xl mb-2 border-b border-gray-300">
-              Professional Summary
-            </h2>
-            <p className="text-sm">{savedData.summary}</p>
-          </div>
+        {user.github && (
+          <p className="text-sm">🐱 GitHub: {user.github}</p>
         )}
 
-        {allSkills.length > 0 && (
-          <div>
-            <h2 className="text-xl mb-2 border-b border-gray-300">Skills</h2>
-            <div className="flex flex-wrap gap-2">
-              {allSkills.map((skill, idx) => (
-                <span
-                  key={idx}
-                  className="text-sm bg-gray-200 px-2 py-1 rounded"
-                >
-                  {skill}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {savedData.experiences.some((e) => e.title) && (
-          <div>
-            <h2 className="text-xl mb-2 border-b border-gray-300">Experience</h2>
-            <div className="space-y-3">
-              {savedData.experiences
-                .filter((e) => e.title)
-                .map((exp, idx) => (
-                  <div key={idx}>
-                    <h3 className="text-base">{exp.title}</h3>
-                    <p className="text-sm text-gray-600">
-                      {exp.company} | {exp.duration}
-                    </p>
-                    <p className="text-sm mt-1">{exp.description}</p>
-                  </div>
-                ))}
-            </div>
-          </div>
-        )}
-
-        {savedData.projects.some((p) => p.name) && (
-          <div>
-            <h2 className="text-xl mb-2 border-b border-gray-300">Projects</h2>
-            <div className="space-y-3">
-              {savedData.projects
-                .filter((p) => p.name)
-                .map((proj, idx) => (
-                  <div key={idx}>
-                    <h3 className="text-base">{proj.name}</h3>
-                    <p className="text-sm">{proj.description}</p>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Technologies: {proj.technologies}
-                    </p>
-                  </div>
-                ))}
-            </div>
-          </div>
-        )}
-
-        {savedData.certifications.some((c) => c) && (
-          <div>
-            <h2 className="text-xl mb-2 border-b border-gray-300">
-              Certifications
-            </h2>
-            <ul className="list-disc pl-5 text-sm">
-              {savedData.certifications
-                .filter((c) => c)
-                .map((c, idx) => (
-                  <li key={idx}>{c}</li>
-                ))}
-            </ul>
-          </div>
-        )}
-
-        {savedData.hobbies.some((h) => h) && (
-          <div>
-            <h2 className="text-xl mb-2 border-b border-gray-300">
-              Hobbies & Interests
-            </h2>
-            <ul className="list-disc pl-5 text-sm">
-              {savedData.hobbies
-                .filter((h) => h)
-                .map((h, idx) => (
-                  <li key={idx}>{h}</li>
-                ))}
-            </ul>
-          </div>
+        {user.portfolio && (
+          <p className="text-sm">💼 Portfolio: {user.portfolio}</p>
         )}
       </div>
-    );
-  };
+
+      {/* EDUCATION */}
+      {savedData.educations?.some(e => e.degree) && (
+        <div>
+          <h2 className="text-xl mb-2 border-b border-gray-300">Education</h2>
+          <div className="space-y-3">
+            {savedData.educations
+              .filter(e => e.degree)
+              .map((edu, idx) => (
+                <div key={idx}>
+                  <h3 className="text-base">{edu.degree}</h3>
+                  <p className="text-sm text-gray-600">
+                    {edu.institution} | {edu.year}
+                  </p>
+                  {edu.description && (
+                    <p className="text-sm mt-1">{edu.description}</p>
+                  )}
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* SUMMARY */}
+      {savedData.summary && (
+        <div>
+          <h2 className="text-xl mb-2 border-b border-gray-300">
+            Professional Summary
+          </h2>
+          <p className="text-sm">{savedData.summary}</p>
+        </div>
+      )}
+
+      {/* SKILLS (DIRECTLY FROM USER MODEL) */}
+      {allSkills.length > 0 && (
+        <div>
+          <h2 className="text-xl mb-2 border-b border-gray-300">Skills</h2>
+          <div className="flex flex-wrap gap-2">
+            {allSkills.map((skill, idx) => (
+              <span
+                key={idx}
+                className="text-sm bg-gray-200 px-2 py-1 rounded"
+              >
+                {skill}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* EXPERIENCE */}
+      {savedData.experiences?.some(e => e.title) && (
+        <div>
+          <h2 className="text-xl mb-2 border-b border-gray-300">Experience</h2>
+          <div className="space-y-3">
+            {savedData.experiences
+              .filter(e => e.title)
+              .map((exp, idx) => (
+                <div key={idx}>
+                  <h3 className="text-base">{exp.title}</h3>
+                  <p className="text-sm text-gray-600">
+                    {exp.company} | {exp.duration}
+                  </p>
+                  <p className="text-sm mt-1">{exp.description}</p>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* PROJECTS */}
+      {savedData.projects?.some(p => p.name) && (
+        <div>
+          <h2 className="text-xl mb-2 border-b border-gray-300">Projects</h2>
+          <div className="space-y-3">
+            {savedData.projects
+              .filter(p => p.name)
+              .map((proj, idx) => (
+                <div key={idx}>
+                  <h3 className="text-base">{proj.name}</h3>
+                  <p className="text-sm">{proj.description}</p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Technologies: {proj.technologies}
+                  </p>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* CERTIFICATIONS */}
+      {savedData.certifications?.some(c => c) && (
+        <div>
+          <h2 className="text-xl mb-2 border-b border-gray-300">Certifications</h2>
+          <ul className="list-disc pl-5 text-sm">
+            {savedData.certifications
+              .filter(c => c)
+              .map((c, idx) => (
+                <li key={idx}>{c}</li>
+              ))}
+          </ul>
+        </div>
+      )}
+
+      {/* HOBBIES */}
+      {savedData.hobbies?.some(h => h) && (
+        <div>
+          <h2 className="text-xl mb-2 border-b border-gray-300">
+            Hobbies & Interests
+          </h2>
+          <ul className="list-disc pl-5 text-sm">
+            {savedData.hobbies
+              .filter(h => h)
+              .map((h, idx) => (
+                <li key={idx}>{h}</li>
+              ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+};
 
   const HistoryTab = () => (
     <div className="max-w-4xl space-y-6">

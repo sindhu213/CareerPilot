@@ -9,6 +9,7 @@ import userRoutes from "./routes/userRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import resumeRoutes from "./routes/resumeRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
+import careerChatRoutes from "./routes/careerChatRoutes.js"
 
 dotenv.config();
 
@@ -21,7 +22,6 @@ connectDB();
 app.use(express.json());
 app.use(cookieParser());
 
-// CORS MUST COME BEFORE ALL ROUTES
 app.use(
   cors({
     origin: CLIENT_URL, 
@@ -36,6 +36,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/resumes", resumeRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/careerChat", careerChatRoutes);
 
 app.get("/", (req, res) => {
   res.send("Server is running correctly!");

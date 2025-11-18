@@ -1,4 +1,4 @@
-
+import applicationsRoutes from "./routes/applicationsRoutes.js";
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -21,6 +21,7 @@ connectDB();
 app.use(express.json());
 app.use(cookieParser());
 
+// CORS MUST COME BEFORE ALL ROUTES
 app.use(
   cors({
     origin: CLIENT_URL, 
@@ -30,6 +31,7 @@ app.use(
   })
 );
 
+app.use("/api/applications", applicationsRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/resumes", resumeRoutes);

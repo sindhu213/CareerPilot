@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { DashboardLayout } from './DashboardLayout';
 import { Card } from './ui/card';
@@ -6,6 +5,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Send, Sparkles } from 'lucide-react';
 import type { User, Page } from '../App';
+import ReactMarkdown from "react-markdown";
 
 type Message = {
   id: number;
@@ -41,7 +41,6 @@ export function CareerPaths({ user, onNavigate }: CareerPathsProps) {
     'Tips for cracking interviews',
   ];
 
-  // ✅ Smooth auto-scroll when messages or typing change
   useEffect(() => {
     const el = scrollRef.current;
     if (el) {
@@ -52,54 +51,50 @@ export function CareerPaths({ user, onNavigate }: CareerPathsProps) {
     }
   }, [messages, isTyping]);
 
-  const handleSendMessage = (customInput?: string) => {
+  const handleSendMessage = async (customInput?: string) => {
     const query = customInput ?? input;
     if (!query.trim()) return;
 
     const userMessage: Message = {
       id: messages.length + 1,
-      role: 'user',
+      role: "user",
       content: query,
       timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    setInput('');
+    setInput("");
     setIsTyping(true);
 
-    setTimeout(() => {
-      const aiResponse = generateAIResponse(query);
-      const assistantMessage: Message = {
-        id: Date.now(),
-        role: 'assistant',
-        content: aiResponse,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
-      setIsTyping(false);
-    }, 1000);
+    const aiText = await fetchAIResponse(query);
+
+    const assistantMessage: Message = {
+      id: Date.now(),
+      role: "assistant",
+      content: aiText,
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, assistantMessage]);
+    setIsTyping(false);
   };
 
-  const generateAIResponse = (query: string): string => {
-    const lower = query.toLowerCase();
+  const fetchAIResponse = async (query: string) => {
+    try {
+      const res = await fetch("http://localhost:5001/api/careerChat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${user.token}`,
+        },
+        body: JSON.stringify({ message: query }),
+      });
 
-    if (lower.includes('resume')) {
-      return `Here are a few ways to improve your resume:\n\n• Use strong action verbs and measurable results\n• Highlight relevant technical and soft skills\n• Keep it tailored for your target role\n• Use a clean, ATS-friendly layout\n\n💡 You can also try our Resume Analyzer tool for AI-based feedback.`;
+      const data = await res.json();
+      return data.reply || "No response from AI.";
+    } catch (err) {
+      return "Error: unable to connect to AI server.";
     }
-
-    if (lower.includes('skill')) {
-      return `🔥 Trending skills in the tech job market:\n\n• React, Next.js, and TypeScript\n• Generative AI & LLM APIs\n• Cloud (AWS, GCP, Azure)\n• Data Engineering (SQL, ETL, Airflow)\n• DevOps & CI/CD\n\nFocus on building real projects to showcase these skills!`;
-    }
-
-    if (lower.includes('career') || lower.includes('path')) {
-      return `Based on your background, you could explore:\n\n• Full Stack Developer\n• AI/ML Engineer\n• Data Analyst / Data Scientist\n• Cloud Engineer\n• Product Management (with technical focus)\n\nWould you like me to suggest a learning roadmap for one of these?`;
-    }
-
-    if (lower.includes('interview')) {
-      return `🧠 Interview Preparation Tips:\n\n• Revise your core CS fundamentals (DSA, DBMS, OS)\n• Practice coding questions daily\n• Prepare STAR-format answers for HR rounds\n• Review your resume line-by-line\n• Research the company before the interview`;
-    }
-
-    return `That's an interesting question! I can help with:\n\n• Career path suggestions\n• Skill gap analysis\n• Resume and interview tips\n• Learning resources\n\nCould you tell me what kind of role or domain you're targeting?`;
   };
 
  return (
@@ -136,21 +131,22 @@ export function CareerPaths({ user, onNavigate }: CareerPathsProps) {
             msg.role === 'user' ? 'justify-end' : 'justify-start'
           }`}
         >
-          <div
-            className={`max-w-[75%] rounded-lg p-3 text-sm whitespace-pre-line ${
-              msg.role === 'user'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted'
-            }`}
-          >
-            {msg.content}
-            <div className="text-xs opacity-60 mt-1">
-              {msg.timestamp.toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
+            <div
+              className={`max-w-[75%] rounded-lg p-3 text-sm ${
+                msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
+              }`}
+            >
+              <div className="prose prose-sm max-w-none whitespace-pre-line">
+                <ReactMarkdown>
+                  {msg.content}
+                </ReactMarkdown>
+              </div>
+
+              <div className="text-xs opacity-60 mt-1">
+                {msg.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </div>
             </div>
-          </div>
+
         </div>
       ))}
 
@@ -214,5 +210,4 @@ export function CareerPaths({ user, onNavigate }: CareerPathsProps) {
 
   </DashboardLayout>
 );
-
 }

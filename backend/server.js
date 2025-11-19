@@ -1,4 +1,4 @@
-
+import applicationsRoutes from "./routes/applicationsRoutes.js";
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -10,6 +10,7 @@ import authRoutes from "./routes/authRoutes.js";
 import resumeRoutes from "./routes/resumeRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
 import resumeAnalyzerRoutes from "./routes/resumeAnalyzerRoutes.js";
+import careerChatRoutes from "./routes/careerChatRoutes.js";
 
 dotenv.config();
 
@@ -24,19 +25,22 @@ app.use(cookieParser());
 
 app.use(
   cors({
-    origin: CLIENT_URL, 
-    credentials: true, 
+    origin: CLIENT_URL,
+    credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
+app.use("/api/applications", applicationsRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/resumes", resumeRoutes);
 app.use("/api/chat", chatRoutes);
-app.use("/api/resume", resumeAnalyzerRoutes);
 
+// Both routes kept
+app.use("/api/resume", resumeAnalyzerRoutes);
+app.use("/api/careerChat", careerChatRoutes);
 
 app.get("/", (req, res) => {
   res.send("Server is running correctly!");

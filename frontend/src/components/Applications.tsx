@@ -13,6 +13,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import type { User, Page } from '../App';
+import { useState, useEffect } from 'react';
 
 type ApplicationsProps = {
   user: User;
@@ -20,7 +21,7 @@ type ApplicationsProps = {
 };
 
 type Application = {
-  id: number;
+  _id: number;
   jobTitle: string;
   company: string;
   location: string;
@@ -28,68 +29,122 @@ type Application = {
   status: 'pending' | 'interview' | 'rejected' | 'accepted';
   nextStep?: string;
   notes?: string;
+  jobUrl?: string;
 };
 
 export function Applications({ user, onNavigate }: ApplicationsProps) {
-  const applications: Application[] = [
-    {
-      id: 1,
-      jobTitle: 'Frontend Developer',
-      company: 'TechCorp Solutions',
-      location: 'Bangalore, India',
-      appliedDate: '2025-10-19',
-      status: 'pending',
-      notes: 'Waiting for HR response'
-    },
-    {
-      id: 2,
-      jobTitle: 'Full Stack Engineer',
-      company: 'DataSystems Inc',
-      location: 'Mumbai, India',
-      appliedDate: '2025-10-16',
-      status: 'interview',
-      nextStep: 'Technical interview on Oct 25, 2025 at 2:00 PM',
-      notes: 'Prepare system design questions'
-    },
-    {
-      id: 3,
-      jobTitle: 'React Developer',
-      company: 'StartupX',
-      location: 'Remote',
-      appliedDate: '2025-10-14',
-      status: 'rejected',
-      notes: 'Looking for more experience'
-    },
-    {
-      id: 4,
-      jobTitle: 'Software Development Engineer',
-      company: 'MegaCorp Technologies',
-      location: 'Hyderabad, India',
-      appliedDate: '2025-10-12',
-      status: 'accepted',
-      nextStep: 'Start date: November 1, 2025',
-      notes: 'Offer letter received!'
-    },
-    {
-      id: 5,
-      jobTitle: 'UI/UX Developer',
-      company: 'DesignHub',
-      location: 'Pune, India',
-      appliedDate: '2025-10-10',
-      status: 'interview',
-      nextStep: 'Design challenge due Oct 23, 2025',
-      notes: 'Submit portfolio samples'
-    },
-    {
-      id: 6,
-      jobTitle: 'Junior Python Developer',
-      company: 'AI Innovations',
-      location: 'Delhi, India',
-      appliedDate: '2025-10-08',
-      status: 'pending',
-      notes: 'Applied through referral'
-    },
-  ];
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [formData, setFormData] = useState({
+    jobTitle: '',
+    company: '',
+    location: '',
+    status: 'pending' as Application['status'],
+    notes: '',
+    jobUrl: ''
+  });
+
+  const API_BASE = 'http://localhost:5001/api';
+
+  // Fetch applications from database
+  useEffect(() => {
+    fetchApplications();
+  }, []);
+
+  const fetchApplications = async () => {
+    try {
+      setIsLoading(true);
+      const userId = (user as any)._id;
+    console.log('Using userId:', userId);
+
+      const response = await fetch(`${API_BASE}/applications?userId=${userId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setApplications(data);
+      } else {
+        console.error('Failed to fetch applications');
+      }
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  try {
+    const newApplication = {
+      ...formData,
+      appliedDate: new Date().toISOString().split('T')[0],
+      userId: (user as any)._id
+    };
+    
+    console.log('Sending application data:', newApplication); 
+
+    const response = await fetch(`${API_BASE}/applications`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(newApplication),
+    });
+
+    console.log('Response status:', response.status); 
+    
+    if (response.ok) {
+      const savedApplication = await response.json();
+      console.log('Saved application:', savedApplication); 
+      setApplications(prev => [...prev, savedApplication]);
+      
+      // Reset form
+      setFormData({
+        jobTitle: '',
+        company: '',
+        location: '',
+        status: 'pending',
+        notes: '',
+        jobUrl: ''
+      });
+    } else {
+      const errorText = await response.text();
+      console.error('Failed to add application. Error:', errorText);
+    }
+  } catch (error) {
+    console.error('Error adding application:', error);
+  }
+};
+
+const handleDeleteApplication = async (applicationId: number) => {
+  if (!confirm('Are you sure you want to delete this application?')) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/applications/${applicationId}`, {
+      method: 'DELETE',
+    });
+
+    if (response.ok) {
+      // Remove the application from the state
+      setApplications(prev => prev.filter(app => app._id !== applicationId));
+      console.log('Application deleted successfully');
+    } else {
+      console.error('Failed to delete application');
+    }
+  } catch (error) {
+    console.error('Error deleting application:', error);
+  }
+};
 
   const getStatusIcon = (status: Application['status']) => {
     switch (status) {
@@ -130,65 +185,81 @@ export function Applications({ user, onNavigate }: ApplicationsProps) {
     rejected: filterByStatus('rejected').length,
   };
 
-  const ApplicationCard = ({ app }: { app: Application }) => (
-    <Card className="p-6">
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-2">
-            {getStatusIcon(app.status)}
-            <h3>{app.jobTitle}</h3>
-          </div>
-          <div className="flex items-center gap-2 mb-2">
-            <Building2 className="size-4 text-muted-foreground" />
-            <span className="text-sm">{app.company}</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <MapPin className="size-4" />
-            <span>{app.location}</span>
-          </div>
+ const ApplicationCard = ({ app }: { app: Application }) => (
+  <Card className="p-6">
+    <div className="flex items-start justify-between mb-4">
+      <div className="flex-1">
+        <div className="flex items-center gap-2 mb-2">
+          {getStatusIcon(app.status)}
+          <h3>{app.jobTitle}</h3>
         </div>
-        {getStatusBadge(app.status)}
-      </div>
-
-      <div className="space-y-2 mb-4">
-        <div className="flex items-center gap-2 text-sm">
-          <Calendar className="size-4 text-muted-foreground" />
-          <span className="text-muted-foreground">Applied:</span>
-          <span>{new Date(app.appliedDate).toLocaleDateString('en-IN', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })}</span>
+        <div className="flex items-center gap-2 mb-2">
+          <Building2 className="size-4 text-muted-foreground" />
+          <span className="text-sm">{app.company}</span>
         </div>
-        
-        {app.nextStep && (
-          <div className="p-3 bg-primary/10 rounded-lg">
-            <p className="text-sm">
-              <strong>Next Step:</strong> {app.nextStep}
-            </p>
-          </div>
-        )}
-
-        {app.notes && (
-          <div className="p-3 bg-muted rounded-lg">
-            <p className="text-sm text-muted-foreground">
-              <strong>Notes:</strong> {app.notes}
-            </p>
-          </div>
-        )}
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <MapPin className="size-4" />
+          <span>{app.location}</span>
+        </div>
       </div>
+      {getStatusBadge(app.status)}
+    </div>
 
-      <div className="flex gap-2">
-        <Button variant="outline" size="sm">
-          <ExternalLink className="size-4 mr-2" />
-          View Job
-        </Button>
-        {app.status === 'interview' && (
-          <Button size="sm">Prepare for Interview</Button>
-        )}
+    <div className="space-y-2 mb-4">
+      <div className="flex items-center gap-2 text-sm">
+        <Calendar className="size-4 text-muted-foreground" />
+        <span className="text-muted-foreground">Applied:</span>
+        <span>{new Date(app.appliedDate).toLocaleDateString('en-IN', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        })}</span>
       </div>
-    </Card>
-  );
+      
+      {app.nextStep && (
+        <div className="p-3 bg-primary/10 rounded-lg">
+          <p className="text-sm">
+            <strong>Next Step:</strong> {app.nextStep}
+          </p>
+        </div>
+      )}
+
+      {app.notes && (
+        <div className="p-3 bg-muted rounded-lg">
+          <p className="text-sm text-muted-foreground">
+            <strong>Notes:</strong> {app.notes}
+          </p>
+        </div>
+      )}
+    </div>
+
+    <div className="flex gap-2">
+      <Button 
+        variant="outline" 
+        size="sm"
+        onClick={() => app.jobUrl && window.open(app.jobUrl, '_blank')}
+        disabled={!app.jobUrl}
+      >
+        <ExternalLink className="size-4 mr-2" />
+        View Job
+      </Button>
+      {app.status === 'interview' && (
+        <Button size="sm">Prepare for Interview</Button>
+      )}
+
+      {/* Add Delete Button */}
+      <Button 
+        variant="destructive" 
+        size="sm"
+        onClick={() => handleDeleteApplication(app._id)}
+      >
+        <XCircle className="size-4 mr-2" />
+        Delete
+      </Button>
+
+    </div>
+  </Card>
+);
 
   return (
     <DashboardLayout currentPage="applications" onNavigate={onNavigate} userName={user.name}>
@@ -225,36 +296,65 @@ export function Applications({ user, onNavigate }: ApplicationsProps) {
         </div>
 
         {/* Add Application Form */}
+
 <Card className="p-6 mb-8">
   <h2 className="text-lg font-semibold mb-4">Add New Application</h2>
-  <form className="grid md:grid-cols-2 gap-4">
+  <form onSubmit={handleSubmit} className="grid md:grid-cols-2 gap-4">
     <div>
       <label className="block text-sm font-medium mb-1">Job Title</label>
       <input 
         type="text" 
+        name="jobTitle"
+        value={formData.jobTitle}
+        onChange={handleInputChange}
         placeholder="e.g. Frontend Developer"
         className="w-full border rounded-lg p-2"
+        required
       />
     </div>
     <div>
       <label className="block text-sm font-medium mb-1">Company</label>
       <input 
         type="text" 
+        name="company"
+        value={formData.company}
+        onChange={handleInputChange}
         placeholder="e.g. TechCorp Solutions"
         className="w-full border rounded-lg p-2"
+        required
       />
     </div>
     <div>
       <label className="block text-sm font-medium mb-1">Location</label>
       <input 
         type="text" 
+        name="location"
+        value={formData.location}
+        onChange={handleInputChange}
         placeholder="e.g. Bangalore, India"
+        className="w-full border rounded-lg p-2"
+        required
+      />
+    </div>
+    <div>
+      <label className="block text-sm font-medium mb-1">Job URL</label>
+      <input 
+        type="url" 
+        name="jobUrl"
+        value={formData.jobUrl}
+        onChange={handleInputChange}
+        placeholder="e.g. https://company.com/job-posting"
         className="w-full border rounded-lg p-2"
       />
     </div>
     <div>
       <label className="block text-sm font-medium mb-1">Status</label>
-      <select className="w-full border rounded-lg p-2">
+      <select 
+        name="status"
+        value={formData.status}
+        onChange={handleInputChange}
+        className="w-full border rounded-lg p-2"
+      >
         <option value="pending">Pending</option>
         <option value="interview">Interview</option>
         <option value="accepted">Accepted</option>
@@ -264,6 +364,9 @@ export function Applications({ user, onNavigate }: ApplicationsProps) {
     <div className="md:col-span-2">
       <label className="block text-sm font-medium mb-1">Notes</label>
       <textarea 
+        name="notes"
+        value={formData.notes}
+        onChange={handleInputChange}
         placeholder="Add any notes about this application..."
         className="w-full border rounded-lg p-2"
         rows={3}
@@ -275,8 +378,12 @@ export function Applications({ user, onNavigate }: ApplicationsProps) {
   </form>
 </Card>
 
-
         {/* Applications List */}
+        {isLoading ? (
+  <Card className="p-12 text-center">
+    <p className="text-muted-foreground">Loading applications...</p>
+  </Card>
+) : (
         <Tabs defaultValue="all">
           <TabsList>
             <TabsTrigger value="all">All ({stats.total})</TabsTrigger>
@@ -287,11 +394,11 @@ export function Applications({ user, onNavigate }: ApplicationsProps) {
           </TabsList>
 
           <TabsContent value="all" className="mt-6 space-y-4">
-            {applications.map(app => <ApplicationCard key={app.id} app={app} />)}
+            {applications.map(app => <ApplicationCard key={app._id} app={app} />)}
           </TabsContent>
 
           <TabsContent value="pending" className="mt-6 space-y-4">
-            {filterByStatus('pending').map(app => <ApplicationCard key={app.id} app={app} />)}
+            {filterByStatus('pending').map(app => <ApplicationCard key={app._id} app={app} />)}
             {filterByStatus('pending').length === 0 && (
               <Card className="p-12 text-center">
                 <p className="text-muted-foreground">No pending applications</p>
@@ -300,7 +407,7 @@ export function Applications({ user, onNavigate }: ApplicationsProps) {
           </TabsContent>
 
           <TabsContent value="interview" className="mt-6 space-y-4">
-            {filterByStatus('interview').map(app => <ApplicationCard key={app.id} app={app} />)}
+            {filterByStatus('interview').map(app => <ApplicationCard key={app._id} app={app} />)}
             {filterByStatus('interview').length === 0 && (
               <Card className="p-12 text-center">
                 <p className="text-muted-foreground">No interviews scheduled</p>
@@ -309,7 +416,7 @@ export function Applications({ user, onNavigate }: ApplicationsProps) {
           </TabsContent>
 
           <TabsContent value="accepted" className="mt-6 space-y-4">
-            {filterByStatus('accepted').map(app => <ApplicationCard key={app.id} app={app} />)}
+            {filterByStatus('accepted').map(app => <ApplicationCard key={app._id} app={app} />)}
             {filterByStatus('accepted').length === 0 && (
               <Card className="p-12 text-center">
                 <p className="text-muted-foreground">No accepted offers yet</p>
@@ -318,7 +425,7 @@ export function Applications({ user, onNavigate }: ApplicationsProps) {
           </TabsContent>
 
           <TabsContent value="rejected" className="mt-6 space-y-4">
-            {filterByStatus('rejected').map(app => <ApplicationCard key={app.id} app={app} />)}
+            {filterByStatus('rejected').map(app => <ApplicationCard key={app._id} app={app} />)}
             {filterByStatus('rejected').length === 0 && (
               <Card className="p-12 text-center">
                 <p className="text-muted-foreground">No rejected applications</p>
@@ -326,6 +433,7 @@ export function Applications({ user, onNavigate }: ApplicationsProps) {
             )}
           </TabsContent>
         </Tabs>
+)}
       </div>
     </DashboardLayout>
   );

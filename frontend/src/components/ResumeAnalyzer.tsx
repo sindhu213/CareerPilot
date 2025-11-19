@@ -46,54 +46,40 @@ export function ResumeAnalyzer({ user, onNavigate }: ResumeAnalyzerProps) {
   };
 
   const handleAnalyze = async () => {
-    if (!file) {
-      toast.error('Please upload a resume first');
-      return;
-    }
+  if (!file) {
+    toast.error('Please upload a resume first');
+    return;
+  }
+  setAnalyzing(true);
 
-    setAnalyzing(true);
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    if (jobDescription) form.append('jobDescription', jobDescription);
+    // optionally include userId
+    if (user?.id) form.append('userId', user.id);
 
-    // Simulate AI analysis (in real app, would call backend API)
-    setTimeout(() => {
-      const mockAnalysis: AnalysisResult = {
-        score: jobDescription ? 84 : 78, // slightly higher if JD provided
-        extractedSkills: [
-          'React',
-          'JavaScript',
-          'TypeScript',
-          'Node.js',
-          'MongoDB',
-          'Git',
-          'REST APIs',
-          'Responsive Design'
-        ],
-        suggestions: [
-          'Add quantifiable achievements with metrics (e.g., "Improved performance by 40%")',
-          'Include action verbs at the start of bullet points',
-          'Add a professional summary section at the top',
-          'Mention specific technologies used in each project',
-          'Add links to GitHub or portfolio projects'
-        ],
-        missingSkills: jobDescription
-          ? ['Docker', 'AWS', 'CI/CD', 'Testing frameworks', 'Jest']
-          : ['Docker', 'AWS', 'CI/CD', 'Testing frameworks'],
-        strengths: [
-          'Clear project descriptions',
-          'Good technical skills coverage',
-          'Well-structured education section',
-          'Recent and relevant experience'
-        ]
-      };
-
-      setAnalysis(mockAnalysis);
-      setAnalyzing(false);
-      toast.success(
-        jobDescription
-          ? 'Resume analyzed based on job description!'
-          : 'Resume analysis complete!'
-      );
-    }, 2000);
-  };
+    const resp = await fetch('http://localhost:5001/api/resume/analyze', {
+      method: 'POST',
+      body: form
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'Failed to analyze');
+    setAnalysis({
+      score: data.analysis.score,
+      extractedSkills: data.analysis.extracted_skills || [],
+      suggestions: data.analysis.suggestions || [],
+      missingSkills: data.analysis.missing_skills || [],
+      strengths: data.analysis.strengths || []
+    });
+    toast.success('Resume analysis complete!');
+  } catch (err) {
+    console.error(err);
+    toast.error('Analysis failed: ' + (err.message || 'Unknown error'));
+  } finally {
+    setAnalyzing(false);
+  }
+};
 
   return (
     <DashboardLayout

@@ -58,3 +58,30 @@ frontend/.env
 # === Optional ===
 # Local configuration
 *.local
+
+
+# === Python ===
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+*.pkl
+*.pickle
+*.py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Python build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+
+
+# Local python settings
+*.env.python

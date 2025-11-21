@@ -8,8 +8,6 @@ router.get('/', async (req, res) => {
   try {
     const { userId } = req.query;
     
-    console.log('Received request for userId:', userId);
-    
     if (!userId || userId === 'undefined') {
       return res.status(400).json({ 
         message: 'User ID is required',
@@ -18,7 +16,6 @@ router.get('/', async (req, res) => {
     }
 
     const applications = await Application.find({ userId }).sort({ createdAt: -1 });
-    console.log('Found applications:', applications.length);
     res.json(applications);
   } catch (error) {
     console.error('Error fetching applications:', error);
@@ -45,7 +42,6 @@ router.post('/', async (req, res) => {
   }
 });
 
-// DELETE application
 // DELETE application
 router.delete('/:id', async (req, res) => {
   try {

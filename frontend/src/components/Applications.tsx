@@ -55,7 +55,6 @@ export function Applications({ user, onNavigate }: ApplicationsProps) {
     try {
       setIsLoading(true);
       const userId = (user as any)._id;
-    console.log('Using userId:', userId);
 
       const response = await fetch(`${API_BASE}/applications?userId=${userId}`);
       if (response.ok) {
@@ -86,13 +85,15 @@ export function Applications({ user, onNavigate }: ApplicationsProps) {
     const newApplication = {
       ...formData,
       appliedDate: new Date().toISOString().split('T')[0],
-      userId: (user as any)._id
+      userId: (user as any)._id,
+      authUserId: (user as any).authUserId
     };
     
     console.log('Sending application data:', newApplication); 
 
     const response = await fetch(`${API_BASE}/applications`, {
       method: 'POST',
+      credentials: "include",
       headers: {
         'Content-Type': 'application/json',
       },
@@ -243,9 +244,6 @@ const handleDeleteApplication = async (applicationId: number) => {
         <ExternalLink className="size-4 mr-2" />
         View Job
       </Button>
-      {app.status === 'interview' && (
-        <Button size="sm">Prepare for Interview</Button>
-      )}
 
       {/* Add Delete Button */}
       <Button 

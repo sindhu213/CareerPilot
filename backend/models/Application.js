@@ -1,6 +1,12 @@
 ﻿import mongoose from 'mongoose';
 
 const applicationSchema = new mongoose.Schema({
+  authUserId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "AuthUser",
+    required: true,
+  },
+
   userId: { 
     type: String, 
     required: true 

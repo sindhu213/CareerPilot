@@ -51,7 +51,6 @@ export function Dashboard({
   useEffect(() => {
     async function getStats() {
       try {
-        console.log("auth:" ,user.authUserId)
         const res = await fetch(`http://localhost:5001/api/stats?userId=${user.authUserId}`);
         const data = await res.json();
         setStats(data);

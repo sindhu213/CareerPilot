@@ -1,4 +1,3 @@
-
 import express from "express";
 import axios from "axios";
 import dotenv from "dotenv";
@@ -10,39 +9,40 @@ router.get("/search", async (req, res) => {
   try {
     let { query = "", location = "", jobType = "", page = "1" } = req.query;
 
-    const globalKeywords = [
-      "software engineer", "developer", "data analyst", "product manager",
-      "marketing", "sales", "remote", "full time", "engineer", "designer",
-      "india", "united kingdom", "germany", "canada", "australia", "europe"
-    ];
-
     let searchQuery = query.toString().trim();
 
-    if (!searchQuery) {
-      const randomKeyword = globalKeywords[Math.floor(Math.random() * globalKeywords.length)];
-      searchQuery = randomKeyword;
+    // Build the search query with location
+    if (location && location !== "all") {
+      const locationStr = location.toString().trim();
+      // Combine job title with location in the query
+      searchQuery = searchQuery 
+        ? `${searchQuery} in ${locationStr}` 
+        : locationStr;
+    } else if (!searchQuery) {
+      // Default search if nothing provided
+      searchQuery = "software developer";
     }
 
     const params = {
       query: searchQuery,
       page: page.toString(),
       num_pages: "1",
-      date_posted: "all",          
-      employment_types: "FULLTIME,PARTTIME,CONTRACTOR,INTERN", 
+      date_posted: "all",
     };
 
-    if (location?.toString().trim()) {
-      params.location = location.toString().trim();
-    }
-
-    if (jobType?.toString().trim()) {
-      const type = jobType.toString().toLowerCase();
-      if (type.includes("remote")) {
+    // Add job type filter if provided
+    if (jobType && jobType !== "all") {
+      const type = jobType.toString().toUpperCase();
+      if (type === "REMOTE") {
         params.remote_jobs_only = "true";
+      } else {
+        params.employment_types = type;
       }
+    } else {
+      params.employment_types = "FULLTIME,PARTTIME,CONTRACTOR,INTERN";
     }
 
-    console.log("Forcing global jobs →", params);
+    console.log("Job search params →", params);
 
     const response = await axios.get("https://jsearch.p.rapidapi.com/search", {
       params,

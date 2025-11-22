@@ -13,6 +13,7 @@ import {
   Clock,
   AlertCircle,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import type { User, Page } from "../App";
 
 type DashboardProps = {
@@ -20,11 +21,78 @@ type DashboardProps = {
   onNavigate: (page: Page) => void;
 };
 
+// Add this interface
+interface Application {
+  _id: string;
+  jobTitle: string;
+  company: string;
+  status: 'pending' | 'interview' | 'rejected' | 'accepted';
+  appliedDate: string;
+  location: string;
+  notes?: string;
+  jobUrl?: string;
+}
+
 export function Dashboard({
   user,
   onNavigate,
 }: DashboardProps) {
   const profileCompletion = calculateProfileCompletion(user);
+  const [stats, setStats] = useState({
+    applications: 0,
+    interviews: 0,
+    skills: 0
+  });
+
+  // Add this state for recent applications
+  const [recentApplications, setRecentApplications] = useState<Application[]>([]);
+  const [loadingApplications, setLoadingApplications] = useState(true);
+
+  useEffect(() => {
+    async function getStats() {
+      try {
+        console.log("auth:" ,user.authUserId)
+        const res = await fetch(`http://localhost:5001/api/stats?userId=${user.authUserId}`);
+        const data = await res.json();
+        setStats(data);
+      } catch (e) {
+        console.error("Error fetching dashboard stats", e);
+      }
+    }
+    getStats();
+  }, [user.authUserId]);
+
+  // Add this new useEffect for fetching recent applications
+  useEffect(() => {
+    async function fetchRecentApplications() {
+      try {
+        const userId = (user as any)._id;
+        const response = await fetch(`http://localhost:5001/api/applications?userId=${userId}`, {
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // Get only the 5 most recent applications
+          const sortedApplications = data
+            .sort((a: Application, b: Application) => 
+              new Date(b.appliedDate).getTime() - new Date(a.appliedDate).getTime()
+            )
+            .slice(0, 3);
+          setRecentApplications(sortedApplications);
+        }
+      } catch (error) {
+        console.error('Error fetching applications:', error);
+      } finally {
+        setLoadingApplications(false);
+      }
+    }
+
+    fetchRecentApplications();
+  }, []);
 
   const quickActions = [
     {
@@ -51,38 +119,6 @@ export function Dashboard({
       page: "jobs" as Page,
       description: "Find opportunities",
     },
-  ];
-
-  const recentApplications = [
-    {
-      id: 1,
-      company: "TechCorp",
-      position: "Frontend Developer",
-      status: "pending",
-      date: "2 days ago",
-    },
-    {
-      id: 2,
-      company: "DataSystems",
-      position: "Full Stack Engineer",
-      status: "interview",
-      date: "5 days ago",
-    },
-    {
-      id: 3,
-      company: "AI Solutions",
-      position: "React Developer",
-      status: "rejected",
-      date: "1 week ago",
-    },
-  ];
-
-  const recommendedSkills = [
-    "TypeScript",
-    "Node.js",
-    "Docker",
-    "GraphQL",
-    "AWS",
   ];
 
   return (
@@ -126,9 +162,9 @@ export function Dashboard({
               </p>
               <Briefcase className="size-4 text-muted-foreground" />
             </div>
-            <div className="text-3xl mb-1">12</div>
+            <div className="text-3xl mb-1">{stats.applications}</div>
             <p className="text-xs text-muted-foreground">
-              +3 this week
+              Updated live
             </p>
           </Card>
 
@@ -139,9 +175,9 @@ export function Dashboard({
               </p>
               <Clock className="size-4 text-muted-foreground" />
             </div>
-            <div className="text-3xl mb-1">5</div>
+            <div className="text-3xl mb-1">{stats.interviews}</div>
             <p className="text-xs text-muted-foreground">
-              2 upcoming
+              Counted from applications
             </p>
           </Card>
 
@@ -153,9 +189,7 @@ export function Dashboard({
               <Target className="size-4 text-muted-foreground" />
             </div>
             <div className="text-3xl mb-1">
-              {(user.technicalSkills?.length || 0) 
-               + (user.softSkills?.length || 0) 
-               + (user.toolsAndTechnologies?.length || 0)}
+              {stats.skills}
             </div>
 
             <p className="text-xs text-muted-foreground">
@@ -195,7 +229,7 @@ export function Dashboard({
             </div>
           </div>
 
-          {/* Recent Activity */}
+          {/* Recent Activity - UPDATED SECTION */}
           <div className="flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <h3>Recent Applications</h3>
@@ -208,41 +242,56 @@ export function Dashboard({
               </Button>
             </div>
             <div className="space-y-3 flex-1">
-              {recentApplications.map((app) => (
-                <Card key={app.id} className="p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <h4 className="mb-1">{app.position}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {app.company}
-                      </p>
-                    </div>
-                    <Badge
-                      variant={
-                        app.status === "interview"
-                          ? "default"
-                          : app.status === "pending"
-                            ? "secondary"
-                            : "destructive"
-                      }
-                    >
-                      {app.status === "interview" && (
-                        <CheckCircle2 className="size-3 mr-1" />
-                      )}
-                      {app.status === "pending" && (
-                        <Clock className="size-3 mr-1" />
-                      )}
-                      {app.status === "rejected" && (
-                        <AlertCircle className="size-3 mr-1" />
-                      )}
-                      {app.status}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {app.date}
+              {loadingApplications ? (
+                <p className="text-sm text-muted-foreground">Loading...</p>
+              ) : recentApplications.length === 0 ? (
+                <Card className="p-4">
+                  <p className="text-sm text-muted-foreground text-center">
+                    No applications yet. Start tracking your job applications!
                   </p>
                 </Card>
-              ))}
+              ) : (
+                recentApplications.map((app) => (
+                  <Card key={app._id} className="p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <h4 className="mb-1">{app.jobTitle}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {app.company}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={
+                          app.status === "interview"
+                            ? "default"
+                            : app.status === "pending"
+                              ? "secondary"
+                              : app.status === "rejected"
+                                ? "destructive"
+                                : "default"
+                        }
+                      >
+                        {app.status === "interview" && (
+                          <CheckCircle2 className="size-3 mr-1" />
+                        )}
+                        {app.status === "pending" && (
+                          <Clock className="size-3 mr-1" />
+                        )}
+                        {app.status === "rejected" && (
+                          <AlertCircle className="size-3 mr-1" />
+                        )}
+                        {app.status === "accepted" && (
+                          <CheckCircle2 className="size-3 mr-1" />
+                        )}
+                        {app.status}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(app.appliedDate).toLocaleDateString()}
+                    </p>
+                  </Card>
+                ))
+              )}
             </div>
           </div>
         </div>

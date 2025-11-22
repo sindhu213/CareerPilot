@@ -12,6 +12,7 @@ import chatRoutes from "./routes/chatRoutes.js";
 import resumeAnalyzerRoutes from "./routes/resumeAnalyzerRoutes.js";
 import careerChatRoutes from "./routes/careerChatRoutes.js";
 import jobRoutes from "./routes/jobRoutes.js";
+import statsRoutes from "./routes/statsRoutes.js";
 
 dotenv.config();
 
@@ -38,6 +39,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/resumes", resumeRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/stats", statsRoutes);
 app.use("/api/resume", resumeAnalyzerRoutes);
 app.use("/api/careerChat", careerChatRoutes);
 app.use("/api/jobs",jobRoutes);

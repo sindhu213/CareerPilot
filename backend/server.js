@@ -11,6 +11,7 @@ import resumeRoutes from "./routes/resumeRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
 import resumeAnalyzerRoutes from "./routes/resumeAnalyzerRoutes.js";
 import careerChatRoutes from "./routes/careerChatRoutes.js";
+import jobRoutes from "./routes/jobRoutes.js";
 
 dotenv.config();
 
@@ -37,10 +38,9 @@ app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/resumes", resumeRoutes);
 app.use("/api/chat", chatRoutes);
-
-// Both routes kept
 app.use("/api/resume", resumeAnalyzerRoutes);
 app.use("/api/careerChat", careerChatRoutes);
+app.use("/api/jobs",jobRoutes);
 
 app.get("/", (req, res) => {
   res.send("Server is running correctly!");

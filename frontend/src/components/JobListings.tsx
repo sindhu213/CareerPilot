@@ -154,7 +154,6 @@ export function JobListings({ user, onNavigate }: JobListingsProps) {
   };
 
   const formatDescription = (description: string, jobId: string): { preview: string; full: string; isTruncated: boolean } => {
-    // Remove excessive whitespace and newlines
     const cleaned = description.replace(/\s+/g, ' ').trim();
     
     const isExpanded = expandedJobs.has(jobId);
@@ -190,14 +189,14 @@ export function JobListings({ user, onNavigate }: JobListingsProps) {
   };
 
   const handleNextPage = () => {
-    if (hasNextPage) {
+    if (hasNextPage && !loading) {
       setCurrentPage(prev => prev + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   const handlePrevPage = () => {
-    if (hasPrevPage) {
+    if (hasPrevPage && !loading) {
       setCurrentPage(prev => prev - 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -225,14 +224,20 @@ export function JobListings({ user, onNavigate }: JobListingsProps) {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                   className="pl-10"
+                  disabled={loading}
                 />
               </div>
             </div>
             
-            <Select value={locationFilter} onValueChange={(value) => {
-              setLocationFilter(value);
-              setCurrentPage(1);
-            }}>
+            <Select 
+              value={locationFilter} 
+              onValueChange={(value) => {
+                setLocationFilter(value);
+                setCurrentPage(1);
+                // fetchJobs will be triggered by handleSearch or manual click
+              }}
+              disabled={loading}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Location" />
               </SelectTrigger>
@@ -246,10 +251,15 @@ export function JobListings({ user, onNavigate }: JobListingsProps) {
               </SelectContent>
             </Select>
 
-            <Select value={typeFilter} onValueChange={(value) => {
-              setTypeFilter(value);
-              setCurrentPage(1);
-            }}>
+            <Select 
+              value={typeFilter} 
+              onValueChange={(value) => {
+                setTypeFilter(value);
+                setCurrentPage(1);
+                // fetchJobs will be triggered by handleSearch or manual click
+              }}
+              disabled={loading}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Job Type" />
               </SelectTrigger>
@@ -263,7 +273,7 @@ export function JobListings({ user, onNavigate }: JobListingsProps) {
             </Select>
           </div>
           <div className="mt-4">
-            <Button onClick={handleSearch} className="w-full md:w-auto">
+            <Button onClick={handleSearch} className="w-full md:w-auto" disabled={loading}>
               <Search className="size-4 mr-2" />
               Search Jobs
             </Button>
@@ -271,16 +281,18 @@ export function JobListings({ user, onNavigate }: JobListingsProps) {
         </Card>
 
         {/* Results Count and Pagination Info */}
-        <div className="mb-4 flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            {loading ? 'Loading...' : `Showing ${jobs.length} ${jobs.length === 1 ? 'job' : 'jobs'} - Page ${currentPage}`}
-          </p>
-        </div>
+        {!loading && (
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Showing {jobs.length} {jobs.length === 1 ? 'job' : 'jobs'} - Page {currentPage}
+            </p>
+          </div>
+        )}
 
         {/* Loading State */}
         {loading && (
-          <div className="flex justify-center items-center py-12">
-            <Loader2 className="size-8 animate-spin text-muted-foreground" />
+          <div className="flex flex-col justify-center items-center py-10">
+            <p className="text-sm text-muted-foreground">Loading jobs...</p>
           </div>
         )}
 
@@ -395,7 +407,7 @@ export function JobListings({ user, onNavigate }: JobListingsProps) {
                 <Button 
                   variant="outline" 
                   onClick={handlePrevPage}
-                  disabled={!hasPrevPage}
+                  disabled={!hasPrevPage || loading}
                 >
                   Previous
                 </Button>
@@ -405,7 +417,7 @@ export function JobListings({ user, onNavigate }: JobListingsProps) {
                 <Button 
                   variant="outline" 
                   onClick={handleNextPage}
-                  disabled={!hasNextPage}
+                  disabled={!hasNextPage || loading}
                 >
                   Next
                 </Button>

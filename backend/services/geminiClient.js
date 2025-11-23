@@ -13,7 +13,6 @@ const MODEL_ID = process.env.GOOGLE_GEMINI_MODEL || "gemini-2.5-flash";
 async function generateResumeAnalysis(payload, retryCount = 0) {
   const { text, entities = {}, jobDescription = "", file_url } = payload;
 
-
 const prompt = `You are a senior technical recruiter and resume parser.
 
 Your only job: Return a clean JSON with these exact keys. NO markdown, NO code blocks, NO extra text.
@@ -47,8 +46,8 @@ Return only the raw JSON starting with { and ending with }:
   const model = genAI.getGenerativeModel({
     model: MODEL_ID,
     generationConfig: {
-  temperature: 0.2, 
-  maxOutputTokens: 2048,
+    temperature: 0.2, 
+    maxOutputTokens: 4096,
 }
   });
 
